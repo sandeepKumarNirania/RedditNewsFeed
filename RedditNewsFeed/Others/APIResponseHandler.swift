@@ -10,7 +10,7 @@ import Foundation
 protocol APIResponseHandler: class {
     associatedtype ViewModel
 
-    var state: InteractorState<ViewModel> { get set }
+    var state: ServiceState<ViewModel> { get set }
 
     var viewModel: ViewModel? { get set }
 
@@ -33,7 +33,7 @@ extension APIResponseHandler {
 
 protocol LazyLoadingHandling: AnyObject {
     associatedtype ViewModel
-    var state: InteractorState<ViewModel> { get set }
+    var state: ServiceState<ViewModel> { get set }
     var viewModel: ViewModel? { get set }
     var isFetchInProgress: Bool { get set }
     var currentPage: Int { get set }

@@ -16,7 +16,7 @@ protocol RedditListRootViewDelegate: AnyObject {
 final class RedditListRootView: UIView {
     unowned var delegate: RedditListRootViewDelegate?
 
-    var viewModel = RedditListViewModel(redditResponseData: nil)
+    var viewModel: RedditListViewModel?
 
     let activityIndicator = UIActivityIndicatorView(style: .medium)
 
@@ -74,7 +74,7 @@ final class RedditListRootView: UIView {
     }
     
     func showError(error: String, retryClosure: @escaping (() -> Void)) {
-        let showCancelButton = !(viewModel.sections.first?.rows.isEmpty ?? true)
+        let showCancelButton = !(viewModel?.sections.first?.rows.isEmpty ?? true)
         
         let alert = UIAlertController(title: "", message: error, preferredStyle: .alert)
                let ok = UIAlertAction(title: "Retry", style: .default, handler: { (action) -> Void in
@@ -91,7 +91,6 @@ final class RedditListRootView: UIView {
 }
 
 // MARK: - ViewConfigurable
-
 extension RedditListRootView {
     func configure(with viewModel: RedditListViewModel) {
         self.viewModel = viewModel
@@ -102,22 +101,24 @@ extension RedditListRootView {
 extension RedditListRootView: UITableViewDataSource, UITableViewDelegate {
     
     func numberOfSections(in tableView: UITableView) -> Int {
-        return viewModel.sections.count
+        return viewModel?.sections.count ?? 0
     }
     
     func tableView(_: UITableView, numberOfRowsInSection section: Int) -> Int {
-        guard !viewModel.sections.isEmpty else { return 0 }
-        if section == viewModel.sections.count - 1 {
-            return viewModel.sections[section].totalRows
+        
+        guard let _viewModel = viewModel else {return 0}
+        guard !_viewModel.sections.isEmpty else { return 0 }
+        if section == _viewModel.sections.count - 1 {
+            return _viewModel.sections[section].totalRows
         } else {
-            return viewModel.sections[section].rows.count
+            return _viewModel.sections[section].rows.count
         }
     }
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let emptyCell = UITableViewCell()
         guard let cell = tableView.dequeueReusableCell(withIdentifier: "RedditCell", for: indexPath) as? RedditCell else {  return emptyCell }
-        if let rowViewModel = viewModel.sections.row(at: indexPath) {
+        if let rowViewModel = viewModel?.sections.row(at: indexPath) {
             cell.configure(with: rowViewModel)
         } else {
             return emptyCell
@@ -126,12 +127,12 @@ extension RedditListRootView: UITableViewDataSource, UITableViewDelegate {
     }
     
     func tableView(_ tableView: UITableView, willDisplay cell: UITableViewCell, forRowAt indexPath: IndexPath) {
-         if indexPath.section == viewModel.sections.count - 1,
+        guard let _viewmodel = viewModel else {return}
+         if indexPath.section == _viewmodel.sections.count - 1,
             indexPath.row == 0,
-            viewModel.sections.isLoadingRow(for: indexPath),
-            let rowViewModel = viewModel.sections.row(at: indexPath),
-                let nextAfterCode = rowViewModel.after {
-                print("\n ==>>>>>>>>> indexPath is \(indexPath)  \n ==>>>>>>>>> nextAfterCode is \(nextAfterCode) \n ==>>>>>>>>> header is \(rowViewModel.headerHash!)")
+            _viewmodel.sections.isLoadingRow(for: indexPath),
+            let rowViewModel = _viewmodel.sections.row(at: indexPath),
+            let nextAfterCode = rowViewModel.after {
                 delegate?.rootViewNeedToFetchMore(code: nextAfterCode)
             }
     }

@@ -9,7 +9,7 @@ import UIKit
 
 public protocol BaseView: NSObjectProtocol {}
 
-enum InteractorState<T> {
+enum ServiceState<T> {
     case loading
     case idle
     case success(_ viewModel: T)
@@ -40,20 +40,17 @@ protocol RedditListView: BaseView {
 final class RedditListViewController: CustomViewController, RedditListView {
     // MARK: - RedditListView
 
-    // MARK: - Properties
-
     /// A wrapper to the root view
     var rootView: RedditListRootView {
         return view as! RedditListRootView
     }
 
-    /// The object responsible of the view business logic
-    var interactor: RedditListInteractorInput
+    var viewModel = RedditListViewModel()
 
+    
     // MARK: - LifeCycle
 
-    init(interactor: RedditListInteractorInput) {
-        self.interactor = interactor
+    override init() {
         super.init()
     }
 
@@ -64,15 +61,15 @@ final class RedditListViewController: CustomViewController, RedditListView {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        interactor.delegate = self
-        interactor.fetchRedditList(code: "")
+        viewModel.delegate = self
+        viewModel.fetchRedditList(code: "")
     }
 }
 
-// MARK: - RedditListInteractorDelegate
+// MARK: - RedditListOutputDelegate
 
-extension RedditListViewController: RedditListInteractorDelegate {
-    func interactor(_: RedditListInteractorInput,
+extension RedditListViewController: RedditListOutputDelegate {
+    func redditList(_: RedditListProtocol,
                     didUpdate state: RedditListState)
     {
         switch state {
@@ -95,7 +92,7 @@ extension RedditListViewController: RedditListInteractorDelegate {
 extension RedditListViewController: RedditListRootViewDelegate {
    
     func refreshData() {
-        interactor.refreshData()
+        viewModel.refreshData()
     }
     
     func showAlert(alert: UIAlertController){
@@ -103,7 +100,7 @@ extension RedditListViewController: RedditListRootViewDelegate {
     }
     
     func rootViewNeedToFetchMore(code: String) {
-        self.interactor.fetchNewData(code: code)
+        viewModel.fetchNewData(code: code)
     }
 
 }
@@ -117,7 +114,6 @@ protocol RedditListControllerFactory {
 
 extension RedditListControllerFactory {
     func makeRedditListController() -> RedditListView {
-        let interactor = RedditListInteractor()
-        return RedditListViewController(interactor: interactor)
+        return RedditListViewController()
     }
 }

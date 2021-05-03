@@ -6,13 +6,52 @@
 //
 
 import Foundation
+import PromiseKit
 
 typealias RedditSection = SectionModel<String, RedditRootViewModel, Void>
+typealias RedditListState = ServiceState<RedditListViewModel>
 
-struct RedditListViewModel: ViewModelSection {
+protocol RedditListProtocol {
+    var delegate: RedditListOutputDelegate? { get set }
+    var state: RedditListState { get }
+    func refreshData()
+    func fetchRedditList(code: String)
+    func fetchNewData(code: String)
+}
+
+protocol RedditListOutputDelegate: AnyObject {
+    /// Tells the delegate that the RedditListState state did update
+    /// - Parameters:
+    ///   - redditer: The redditer object informing the delegate of this impending event.
+    ///   - state: The `RedditListState`  state
+    func redditList(_ redditer: RedditListProtocol,
+                    didUpdate state: RedditListState)
+}
+
+class RedditListViewModel: ViewModelSection {
+    
+    var currentPage: Int = 1
+    weak var delegate: RedditListOutputDelegate?
+    let provider = MoyaNetwork<RedditAPI>()
+    var viewModel: RedditListViewModel?
+
+    internal var isFetchInProgress = false
     var sections: [RedditSection] = []
+    var code: String = ""
 
-    init(redditResponseData: RootData?) {
+    /// The object describing the state of the RedditList API
+    internal var state: RedditListState = .idle {
+        didSet {
+            DispatchQueue.main.async {
+                self.delegate?
+                    .redditList(self, didUpdate: self.state)
+            }
+        }
+    }
+    
+    init(){}
+
+     init(redditResponseData: RootData?) {
         guard let _redditResponseData = redditResponseData else {
             return
         }
@@ -25,37 +64,35 @@ struct RedditListViewModel: ViewModelSection {
     }
 }
 
-struct RedditRootViewModel {
-    let created: String?
-    let headerHash: String?
-    let title: String?
-    let imageURL: URL?
-    let commentNumber: String?
-    let score: Int?
-    let after: String?
-    private let thumbnailWidth: Double?
-    private let thumbnailHeight: Double?
-
-    var aspectRatio: Double {
-        guard let width = thumbnailWidth,
-              let height = thumbnailHeight else { return 1.0 }
-        
-        let _aspectRatio = (width < height)
-                           ? (Double(width)/Double(height))
-                           : (Double(height)/Double(width))
-        return _aspectRatio
+extension RedditListViewModel: RedditListProtocol, LazyLoadingHandling {
+     func refreshData() {
+        fetchFromAPI()
     }
     
-    init(reddit: Reddit, afterCode: String?, header: String) {
-        created = "\(reddit.child?.created ?? 0)"
-        headerHash = header
-        title = reddit.child?.title ?? ""
-        commentNumber = "\(reddit.child?.numComments ?? 1)"
-        score = reddit.child?.score
-        after = afterCode
-        let urlString = reddit.child?.thumbnail ?? ""
-        imageURL = URL(string: urlString)
-        thumbnailWidth = reddit.child?.thumbnailWidth
-        thumbnailHeight = reddit.child?.thumbnailHeight
+     func fetchRedditList(code: String){
+        self.code = code
+        self.fetchFirstPage(requestClosure: fetchFromAPI)
+    }
+    
+     func fetchNewData(code: String) {
+        self.code = code
+        fetchFromAPI()
+    }
+    
+     private func fetchFromAPI() {
+        guard !isFetchInProgress else {
+            return
+        }
+        isFetchInProgress = true
+        provider.request(.reddit(after: code)).decodeRedditResponse(as: RootData.self)
+        .map{ rootData -> RedditListViewModel in
+          return RedditListViewModel(redditResponseData: rootData)
+        }
+        .done(handleNewViewModel)
+        .catch(policy: .allErrorsExceptCancellation) { [weak self] error in
+            self?.isFetchInProgress = false
+        }
     }
 }
+
+
